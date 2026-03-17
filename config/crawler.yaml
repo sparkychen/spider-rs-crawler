@@ -1,0 +1,37 @@
+# 企业级爬虫配置模板（敏感信息通过环境变量注入）
+redis:
+  url: "redis://127.0.0.1:6379/0"
+  cookie_ttl: 86400  
+login:
+  url: "https://mail.163.com/"
+  username: "${LOGIN_USERNAME}"
+  password: "${LOGIN_PASSWORD}"
+  username_selector: "#username"
+  password_selector: "#password"
+  login_btn_selector: "#login-submit"
+# ✅ 关键修复：cookie是单行字符串，不是map
+cookie: "session=123456; user=test; token=7890"
+#cookie:
+#  key: "spider:cookie:target-site"
+#  ttl: 86400
+crawl:
+  target_url: "https://mail.163.com/"
+  #target_url: "https://target-site.com/dashboard"
+  depth: 3
+  concurrency: 100
+  use_chrome: true
+  download_dir: "downloads/163mail"    # 自定义下载目录（可选，默认：downloads/）
+request_delay: 1000
+proxy: ""
+user_agent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+chrome:
+  headless: true
+storage:
+  minio:
+    endpoint: "http://127.0.0.1:9000"
+    access_key: "${MINIO_ACCESS_KEY}"
+    secret_key: "${MINIO_SECRET_KEY}"
+    bucket: "spider-crawl-results"
+monitor:
+  metrics_port: 9090
+  log_level: "info"

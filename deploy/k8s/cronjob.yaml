@@ -1,0 +1,52 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: spider-enterprise-crawler
+spec:
+  schedule: "0 2 * * *"  # 每日凌晨2点执行
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: crawler
+            image: your-registry/spider-enterprise-crawler:v2.45.0
+            command: ["/opt/spider/spider-enterprise-crawler"]
+            args: ["--config", "/opt/spider/config/crawler.yaml"]
+            env:
+            - name: LOGIN_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: spider-secrets
+                  key: LOGIN_USERNAME
+            - name: LOGIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: spider-secrets
+                  key: LOGIN_PASSWORD
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: spider-secrets
+                  key: MINIO_ACCESS_KEY
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: spider-secrets
+                  key: MINIO_SECRET_KEY
+            volumeMounts:
+            - name: config
+              mountPath: /opt/spider/config
+            resources:
+              limits:
+                cpu: "4"
+                memory: "8Gi"
+              requests:
+                cpu: "2"
+                memory: "4Gi"
+          volumes:
+          - name: config
+            configMap:
+              name: spider-crawler-config
+          restartPolicy: OnFailure

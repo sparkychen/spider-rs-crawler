@@ -1,0 +1,52 @@
+load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_library")
+#load("@bazel_tools//tools/build_defs/pkg:tar.bzl", "pkg_tar")
+load("@rules_pkg//pkg:tar.bzl", "pkg_tar") 
+
+# 核心库模块
+rust_library(
+    name = "crawler_lib",
+    srcs = glob(["src/**/*.rs"]),
+    crate_name = "spider_enterprise_crawler",
+    edition = "2021",
+    deps = [
+        "@crate_index//:spider",
+        "@crate_index//:tokio",
+        "@crate_index//:serde",
+        "@crate_index//:serde_json",
+        "@crate_index//:serde_yaml",
+        "@crate_index//:redis",
+        "@crate_index//:minio",
+        "@crate_index//:prometheus",
+        "@crate_index//:tracing",
+        "@crate_index//:tracing-subscriber",
+        "@crate_index//:anyhow",
+        "@crate_index//:thiserror",
+        "@crate_index//:rand",
+        "@crate_index//:chrono",
+    ],
+)
+
+# 可执行二进制文件
+rust_binary(
+    name = "spider-enterprise-crawler",
+    srcs = ["src/main.rs"],
+    crate_name = "spider_enterprise_crawler_bin",
+    edition = "2021",
+    deps = [":crawler_lib"],
+    data = [
+        "config/crawler.yaml",
+        "config/prometheus.yaml",
+    ],
+)
+
+# 企业级分发包
+pkg_tar(
+    name = "crawler-package",
+    srcs = [":spider-enterprise-crawler"],
+    package_dir = "/opt/spider",
+    data = [
+        "config/",
+        "scripts/",
+    ],
+    mode = "0755",
+)

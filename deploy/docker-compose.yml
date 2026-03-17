@@ -1,0 +1,42 @@
+#version: '3.8'
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: always
+
+  minio:
+    #image: minio/minio:latest
+    container_name: spider-rs-minio
+    image: minio/minio:RELEASE.2024-12-18T13-15-44Z
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio-data:/data
+    command: server /data --console-address ":9001"
+    restart: always
+
+  crawler:
+    build: .
+    depends_on:
+      - redis
+      - minio
+    environment:
+      LOGIN_USERNAME: ${LOGIN_USERNAME}
+      LOGIN_PASSWORD: ${LOGIN_PASSWORD}
+      MINIO_ACCESS_KEY: minio-admin
+      MINIO_SECRET_KEY: minio-password
+    volumes:
+      - ./config:/opt/spider/config
+    restart: on-failure
+
+volumes:
+  redis-data:
+  minio-data:

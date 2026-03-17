@@ -1,0 +1,48 @@
+use anyhow::{Context, Result};
+use minio::s3::client::{Client, ClientBuilder};
+use minio::s3::creds::StaticProvider;
+use minio::s3::types::S3ErrorCode;
+use std::io::Cursor;
+use crate::config::StorageConfig;
+
+/// 保存HTML到MinIO对象存储
+pub async fn save_html(config: &StorageConfig, url: &str, html: String) -> Result<()> {
+    // 构建MinIO客户端
+    let static_provider = StaticProvider::new(
+        config.minio.access_key.clone(),
+        config.minio.secret_key.clone(),
+        None,
+    );
+
+    let client = ClientBuilder::new(config.minio.endpoint.parse()?)
+        .provider(Some(Box::new(static_provider)))
+        .build()?;
+
+    // 检查桶是否存在，不存在则创建
+    let bucket_exists = client.bucket_exists(&config.minio.bucket).await?;
+    if !bucket_exists {
+        client.make_bucket(&config.minio.bucket, None).await?;
+        tracing::info!("Created MinIO bucket: {}", config.minio.bucket);
+    }
+
+    // 生成对象名（URL编码，避免特殊字符）
+    let object_name = format!("{}.html", url.replace('/', "_").replace(":", "_").replace("?", "_"));
+    let content = html.into_bytes();
+    let cursor = Cursor::new(content.clone());
+
+    // 上传文件
+    client
+        .put_object_stream(
+            &config.minio.bucket,
+            &object_name,
+            cursor,
+            content.len() as u64,
+            None,
+            None,
+        )
+        .await
+        .with_context(|| format!("Failed to upload {} to MinIO", object_name))?;
+
+    tracing::debug!("Saved HTML to MinIO: {}", object_name);
+    Ok(())
+}

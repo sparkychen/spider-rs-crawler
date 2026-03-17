@@ -1,0 +1,24 @@
+# Rust
+target/
+Cargo.lock.bak
+*.rs.bk
+
+# Bazel
+bazel-*
+/bazel-bin
+/bazel-out
+/bazel-testlogs
+
+# 环境变量
+.env
+
+# 日志
+*.log
+logs/
+
+# 爬取结果
+crawl_results/
+
+# 临时文件
+*.tmp
+*.temp
