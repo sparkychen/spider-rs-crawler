@@ -3,7 +3,7 @@ redis:
   url: "redis://127.0.0.1:6379/0"
   cookie_ttl: 86400  
 login:
-  url: "https://mail.163.com/"
+  url: "https://passport.jd.com/uc/login"
   username: "${LOGIN_USERNAME}"
   password: "${LOGIN_PASSWORD}"
   username_selector: "#username"
@@ -19,7 +19,7 @@ chrome:
   executable_path: "/usr/bin/chromium-browser" # linux
   # executable_path: "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe" # windows
 crawl:
-  target_url: "https://mail.163.com/js6/main.jsp"
+  target_url: "https://order.jd.com/center/list.action"
   #target_url: "https://target-site.com/dashboard"
   depth: 3
   concurrency: 100
