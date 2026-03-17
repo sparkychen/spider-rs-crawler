@@ -46,7 +46,6 @@ load(
 apple_support_dependencies()
 
 
-
 http_archive(
     name = "aspect_bazel_lib",
     sha256 = "f2c1f91cc0a55f7a44c94b8a79974f21349b844075740c01045acaa49e731307",
@@ -55,8 +54,16 @@ http_archive(
 )
 
 load("@aspect_bazel_lib//lib:repositories.bzl", "aspect_bazel_lib_dependencies")
-
 aspect_bazel_lib_dependencies()
+
+http_archive(
+    name = "platforms",
+    urls = [
+        "https://mirror.bazel.build/github.com/bazelbuild/platforms/releases/download/0.0.8/platforms-0.0.8.tar.gz",
+        "https://gh-proxy.org/https://github.com/bazelbuild/platforms/releases/download/0.0.8/platforms-0.0.8.tar.gz",
+    ],
+    sha256 = "8150406605389ececb6da07cbcb509d5637a3ab9a24bc69b1101531367d89d74",
+)
 
 # ========== 3. 加载 rules_pkg 依赖（需在 bazel_skylib 之后） ==========
 # 加载rules_pkg规则
