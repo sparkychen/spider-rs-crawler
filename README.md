@@ -101,8 +101,8 @@ docker login docker.io -u 你的用户名 -p 你的密码
 ./scripts/build.sh --release --docker --push
 
 ## 全流程（构建 → 打包 → 镜像 → 推送 → K8s 部署）
-# 1. 前置：确保 Kubectl 已配置目标 K8s 集群（kubectl config use-context 你的集群）
-# 2. 登录镜像仓库
+### 1. 前置：确保 Kubectl 已配置目标 K8s 集群（kubectl config use-context 你的集群）
+### 2. 登录镜像仓库
 docker login 你的镜像仓库地址 -u 用户名 -p 密码
-# 3. 全流程执行：启动依赖 → 构建 Release → 打包 → 构建镜像 → 推送 → 部署到 K8s
+### 3. 全流程执行：启动依赖 → 构建 Release → 打包 → 构建镜像 → 推送 → 部署到 K8s
 ./scripts/build.sh --release --bundle --start-deps --docker --push --deploy
