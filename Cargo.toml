@@ -20,7 +20,7 @@ dotenv = "0.15"
 cookie = "0.18.1"
 time = { version = "0.3", features = ["serde", "local-offset"] } # ✅ 新增：处理时间转换
 # 异步运行时
-tokio = { version = "1.50", features = ["full", "process"] }
+tokio = { version = "1.0", features = ["full", "process"] }
 # 配置管理
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -49,3 +49,6 @@ chrono = { version = "0.4", features = ["serde"] }
 regex = "1.10.3"
 lazy_static = "1.4.0"
 chromiumoxide = "0.9.1"
+# 真实浏览器核心依赖（关键！）
+headless_chrome = "1.0.21"
+#chromiumoxide = "0.5.0"  # 新增：解决截图枚举依赖

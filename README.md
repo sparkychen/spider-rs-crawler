@@ -13,7 +13,9 @@ sudo apt install -y gcc-11 g++-11
 export CC=gcc-11 CXX=g++-11    
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh  
 sudo apt install -y xvfb   
-cargo add chromiumoxide@0.9.1 && cargo add cookie@0.18.1   
+//cargo add chromiumoxide@0.9.1 && cargo add cookie@0.18.1 
+//cargo add headless_chrome@0.11.0  
+//cargo add tokio@1.0 --features full    
 
 
 ## 验证安装  
