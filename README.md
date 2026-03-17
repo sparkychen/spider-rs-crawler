@@ -23,8 +23,9 @@ export LOGIN_USERNAME=cjf_junfeng@163.com
 export LOGIN_PASSWORD=****************  
 
 ## 安装 npm node
-curl -o- https://gh-proxy.org/https://github.com/nvm-sh/nvm/blob/v0.40.4/install.sh | bash  
-# wget -qO- https://gh-proxy.org/https://github.com/nvm-sh/nvm/blob/v0.40.4/install.sh | bash    
+curl -o- https://gh-proxy.org/https://github.com/nvm-sh/nvm/blob/v0.40.4/install.sh | bash 
+###或   
+wget -qO- https://gh-proxy.org/https://github.com/nvm-sh/nvm/blob/v0.40.4/install.sh | bash    
 然后将下面内容配置到~/.bashrc    
 export NVM_DIR="$HOME/.nvm"    
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm    
