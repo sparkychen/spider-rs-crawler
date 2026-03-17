@@ -198,7 +198,6 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter("spider_enterprise_crawler=info")
         .init();
-
     // 1. 加载配置
     let config = load_config_file("config/crawler.yaml").await?;
     info!("✅ 配置加载成功");
