@@ -221,14 +221,14 @@ async fn main() -> Result<()> {
         }
         // 情况2：Cookie无效/不存在/Redis异常，执行Chrome模拟登录
         _ => {
-            warn!("⚠️ Redis中无有效Cookie，执行Chrome模拟登录...");
+            warn!("⚠️ Redis中无有效Cookie，执行Chrome登录...");
             // 调用chrome_login.rs的核心登录函数（增强错误处理）
             let cookies = match chrome_login(&config).await {
                 Ok(c) => c,
                 Err(e) => {
                     // 登录失败：打印详细错误信息 + 终止程序
                     error!("==================================================");
-                    error!("❌ Chrome模拟登录失败，爬取流程终止！");
+                    error!("❌ Chrome登录失败，爬取流程终止！");
                     error!("📌 登录目标URL：{}", config.login.url);
                     error!("📌 登录账号：{}", config.login.username);
                     error!("📌 失败原因：{}", e);
