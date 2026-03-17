@@ -7,6 +7,11 @@ module(
 
 # 仅保留Rust构建核心规则（删除所有其他依赖，杜绝冲突）
 bazel_dep(name = "rules_rust", version = "0.48.0")
+# 强制关闭扩展自动加载（关键：杜绝rules_rust扩展触发错误）
+#common_extensions = use_extension("@bazel_tools//tools/build_defs/repo:extensions.bzl", "common_extensions")
+#common_extensions.no_extensions()
+# 强制启用Bzlmod兼容模式（解决依赖解析）
+enable_bzlmod = True
 
 # Rust工具链配置（rules_rust 0.48.0 官方标准属性）
 rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")

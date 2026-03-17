@@ -4,7 +4,7 @@ enable_bzlmod = False
 # 新增 local_repository 规则，指向本地文件
 local_repository(
     name = "bazel_features",
-    path = "./bazel_features-v1.21.0.tar.gz", # 替换为你的实际保存路径
+    path = "./bazel_local_modules/bazel_features-v1.21.0", # 替换为你的实际保存路径
 )
 
 # ========== 第一步：必须先加载 http_archive 函数（核心修复） ==========
@@ -15,15 +15,48 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 http_archive(
     name = "bazel_skylib",
     sha256 = "cd55a062e763b9349921f0f5db8c3933288dc8ba4f76dd9416aac68acee3cb94",
-    urls = ["https://github.com/bazelbuild/bazel-skylib/releases/download/1.5.0/bazel-skylib-1.5.0.tar.gz"],
+    urls = ["https://gh-proxy.org/https://github.com/bazelbuild/bazel-skylib/releases/download/1.5.0/bazel-skylib-1.5.0.tar.gz"],
 )
 
 # ========== 2. 修复 rules_pkg（改用 0.15.0 稳定版，链接有效） ==========
-http_archive(
+#http_archive(
+#    name = "rules_pkg",
+#    sha256 = "706e77645016c510765ecc46e8c1f18444f0a81e8a191107e9367c91c93953a0",
+#    urls = ["https://github.com/bazelbuild/rules_pkg/releases/download/0.15.0/rules_pkg-0.15.0.tar.gz"],
+#)
+local_repository(
     name = "rules_pkg",
-    sha256 = "706e77645016c510765ecc46e8c1f18444f0a81e8a191107e9367c91c93953a0",
-    urls = ["https://github.com/bazelbuild/rules_pkg/releases/download/0.15.0/rules_pkg-0.15.0.tar.gz"],
+    path = "./bazel_local_modules/rules_pkg-1.0.1/", # 替换为你的实际保存路径
 )
+
+local_repository(
+    name = "platforms",
+    path = "./bazel_local_modules/platforms-0.0.8/", # 替换为你的实际保存路径
+)
+
+http_archive(
+    name = "build_bazel_apple_support",
+    sha256 = "1c4031e72b456a048d8177f59a5581808c07585fa9e255c6f5fefb8752af7e40",
+    url = "https://gh-proxy.org/https://github.com/bazelbuild/apple_support/releases/download/1.13.0/apple_support.1.13.0.tar.gz",
+)
+load(
+    "@build_bazel_apple_support//lib:repositories.bzl",
+    "apple_support_dependencies",
+)
+apple_support_dependencies()
+
+
+
+http_archive(
+    name = "aspect_bazel_lib",
+    sha256 = "f2c1f91cc0a55f7a44c94b8a79974f21349b844075740c01045acaa49e731307",
+    strip_prefix = "bazel-lib-1.40.3",
+    url = "https://gh-proxy.org/https://github.com/aspect-build/bazel-lib/releases/download/v1.40.3/bazel-lib-v1.40.3.tar.gz",
+)
+
+load("@aspect_bazel_lib//lib:repositories.bzl", "aspect_bazel_lib_dependencies")
+
+aspect_bazel_lib_dependencies()
 
 # ========== 3. 加载 rules_pkg 依赖（需在 bazel_skylib 之后） ==========
 # 加载rules_pkg规则
