@@ -26,11 +26,6 @@ struct Config {
     crawl: CrawlConfig,
     redis: RedisConfig,
     cookie: String,
-    login: LoginConfig,      // 新增：登录配置
-    chrome: ChromeConfig,    // 新增：Chrome配置
-    cookie_key: String,      // 新增：Cookie存储的Redis Key
-    proxy: String,           // 新增：代理配置
-    request_delay: u64,      // 新增：请求延迟
 }
 
 #[derive(Deserialize, Debug)]
@@ -45,22 +40,6 @@ struct CrawlConfig {
 struct RedisConfig {
     url: String,
     cookie_ttl: u64,
-}
-
-// ========== 新增：登录/Chrome配置结构体（匹配yaml） ==========
-#[derive(Deserialize, Debug, Clone)]
-struct LoginConfig {
-    url: String,
-    username: String,
-    password: String,
-    username_selector: String,
-    password_selector: String,
-    login_btn_selector: String,
-}
-
-#[derive(Deserialize, Debug, Clone)]
-struct ChromeConfig {
-    headless: bool,
 }
 
 // ========== 工具函数：创建目录 ==========
@@ -116,16 +95,7 @@ async fn load_config_file(path: &str) -> Result<Config> {
     serde_yaml::from_str(&content).context("❌ 解析YAML失败")
 }
 
-// ========== 新增：Cookie转字符串工具函数 ==========
-fn cookies_to_string(cookies: &[Cookie]) -> String {
-    cookies
-        .iter()
-        .map(|c| format!("{}={}", c.name(), c.value()))
-        .collect::<Vec<_>>()
-        .join("; ")
-}
-
-// ========== 核心爬取逻辑 ==========
+// ========== 核心爬取逻辑（修复最后一个类型错误） ==========
 async fn start_crawling(cfg: &CrawlConfig, cookie: &str) -> Result<()> {
     info!("🕷️ 开始爬取：{}", cfg.target_url);
 
@@ -208,30 +178,18 @@ async fn main() -> Result<()> {
     let mut redis_conn = redis_client.get_multiplexed_async_connection().await?;
     info!("✅ Redis连接成功");
 
-    // 3. 处理Cookie（核心修改：新增模拟登录逻辑）
-    let cookie_store = CookieStore::new(&config.redis.url).await?;
-    let current_cookie: String = match cookie_store.is_cookie_valid(&config.cookie_key).await {
-        // 情况1：Redis中有有效Cookie，直接加载
-        Ok(true) => {
-            let cookies = cookie_store.get_cookies(&config.cookie_key).await.context("❌ 读取Redis Cookie失败")?;
-            let cookie_str = cookies_to_string(&cookies);
-            info!("✅ 从Redis加载有效Cookie");
-            cookie_str
+    // 3. 缓存Cookie
+    let cookie_key = "crawler:cookie";
+    let cached_cookie: Option<String> = redis_conn.get(cookie_key).await?;
+    let current_cookie = match cached_cookie {
+        Some(c) => {
+            info!("✅ 从Redis加载Cookie");
+            c
         }
-        // 情况2：Cookie无效/不存在/Redis异常，执行Chrome模拟登录
-        _ => {
-            warn!("⚠️ Redis中无有效Cookie，执行Chrome模拟登录...");
-            // 调用chrome_login.rs的核心登录函数
-            let cookies = chrome_login(&config).await.context("❌ Chrome模拟登录失败")?;
-            let cookie_str = cookies_to_string(&cookies);
-            // 登录成功后，将Cookie存入Redis（复用原有逻辑）
-            redis_conn.set_ex::<_, _, ()>(
-                &config.cookie_key,
-                &cookie_str,
-                config.redis.cookie_ttl
-            ).await.context("❌ Cookie存入Redis失败")?;
-            info!("✅ 模拟登录成功，Cookie已缓存（有效期：{}秒）", config.redis.cookie_ttl);
-            cookie_str
+        None => {
+            redis_conn.set_ex::<_, _, ()>(cookie_key, &config.cookie, config.redis.cookie_ttl).await?;
+            info!("✅ Cookie存入Redis（有效期：{}秒）", config.redis.cookie_ttl);
+            config.cookie
         }
     };
 

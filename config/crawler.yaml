@@ -15,7 +15,7 @@ cookie: "session=123456; user=test; token=7890"
 #  key: "spider:cookie:target-site"
 #  ttl: 86400
 crawl:
-  target_url: "https://mail.163.com/"
+  target_url: "https://mail.163.com/js6/main.jsp"
   #target_url: "https://target-site.com/dashboard"
   depth: 3
   concurrency: 100
