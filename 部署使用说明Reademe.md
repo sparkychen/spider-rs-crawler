@@ -25,10 +25,10 @@ export LOGIN_PASSWORD=****************
 ## 安装 npm node
 curl -o- https://gh-proxy.org/https://github.com/nvm-sh/nvm/blob/v0.40.4/install.sh | bash  
 # wget -qO- https://gh-proxy.org/https://github.com/nvm-sh/nvm/blob/v0.40.4/install.sh | bash    
-然后将下面内容配置到~/.bashrc  
-export NVM_DIR="$HOME/.nvm"  
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm  
-[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion  
+然后将下面内容配置到~/.bashrc    
+export NVM_DIR="$HOME/.nvm"    
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm    
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion    
  再执行如下命令  
 source ~/.bashrc  
 
@@ -40,18 +40,18 @@ nvm use 12.22.12
 wget "https://gh-proxy.org/https://github.com/bazelbuild/bazel/releases/download/7.0.0/bazel-7.0.0-linux-x86_64"  
 cp bazel-7.0.0-linux-x86_64 .nvm/versions/node/v12.22.12/bin/bazel  
 之后验证bzael是否配置成功（若显示版本则成功）：  
-bazel --version  
+bazel --version    
 
 ## 在项目配置文件config/crawler.yaml中配置登陆url和爬取html url:  
-login:  
-  url: "https://mail.163.com/"  
-crawl:  
-  target_url: "https://mail.163.com/"  
+login:    
+  url: "https://mail.163.com/"    
+crawl:    
+  target_url: "https://mail.163.com/"    
 
 ## 单机配置爬取url文件(下载)目录：  
-crawl:  
-  target_url: "https://mail.163.com/"  
-  download_dir: "downloads/163mail"    # 自定义下载目录（可选，默认：downloads/）  
+crawl:    
+  target_url: "https://mail.163.com/"      
+  download_dir: "downloads/163mail"    # 自定义下载目录（可选，默认：downloads/）    
 
 # 二、启动  
 ## 1、命令行启动，启动redis等 docker镜像  
