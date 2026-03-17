@@ -1,14 +1,11 @@
-// 1. 基础依赖导入
 use anyhow::{Context, Result};
 use redis::AsyncCommands;
 use serde::Deserialize;
-use tracing::info;
+use tracing::{info, warn};
 use std::path::Path;
 use urlencoding::encode;
-// 2. 正则+懒加载依赖
 use regex::Regex;
 use lazy_static::lazy_static;
-// 3. Spider核心类型
 use spider::client::header::{HeaderMap, HeaderValue, COOKIE};
 use spider::client::StatusCode;
 use spider::configuration::Configuration;
@@ -17,18 +14,17 @@ use spider::website::Website;
 use spider::cookie::Cookie;
 use std::time::Duration;
 
-
 // ========== 新增：引入login模块（关键） ==========
 mod login;
 use login::chrome_login::chrome_login;
 use login::cookie_store::CookieStore;
 
-// ========== 配置结构体 ==========
+// ========== 配置结构体（仅补充登录相关字段，其他完全不变） ==========
 #[derive(Deserialize, Debug)]
 struct Config {
     crawl: CrawlConfig,
     redis: RedisConfig,
-    cookie: String,
+    cookie: String,          // 原有字段
     login: LoginConfig,      // 新增：登录配置
     chrome: ChromeConfig,    // 新增：Chrome配置
     cookie_key: String,      // 新增：Cookie存储的Redis Key
@@ -66,7 +62,7 @@ struct ChromeConfig {
     headless: bool,
 }
 
-// ========== 工具函数：创建目录 ==========
+// ========== 工具函数：创建目录（原有） ==========
 async fn create_dir_if_not_exists(dir: &str) -> Result<()> {
     if !Path::new(dir).exists() {
         tokio::fs::create_dir_all(dir)
@@ -77,12 +73,12 @@ async fn create_dir_if_not_exists(dir: &str) -> Result<()> {
     Ok(())
 }
 
-// ========== 核心：正则解析标题 ==========
+// ========== 核心：正则解析标题（原有） ==========
 lazy_static! {
     static ref TITLE_REGEX: Regex = Regex::new(r"(?i)<title>([\s\S]*?)</title>").unwrap();
 }
 
-// 函数参数兼容String/&str：接收&str
+// 函数参数兼容String/&str：接收&str（原有）
 fn get_title_from_html(html: &str) -> String {
     match TITLE_REGEX.captures(html) {
         Some(caps) => {
@@ -93,7 +89,7 @@ fn get_title_from_html(html: &str) -> String {
     }
 }
 
-// ========== 保存HTML页面 ==========
+// ========== 保存HTML页面（原有） ==========
 async fn save_page(page: &Page, download_dir: &str) -> Result<()> {
     let url = page.get_url();
     let encoded_url = encode(url);
@@ -110,7 +106,7 @@ async fn save_page(page: &Page, download_dir: &str) -> Result<()> {
     Ok(())
 }
 
-// ========== 加载配置 ==========
+// ========== 加载配置（原有） ==========
 async fn load_config_file(path: &str) -> Result<Config> {
     let content = tokio::fs::read_to_string(path)
         .await
@@ -128,7 +124,7 @@ fn cookies_to_string(cookies: &[Cookie]) -> String {
         .join("; ")
 }
 
-// ========== 核心爬取逻辑 ==========
+// ========== 核心爬取逻辑（完全原有，无修改） ==========
 async fn start_crawling(cfg: &CrawlConfig, cookie: &str) -> Result<()> {
     info!("🕷️ 开始爬取：{}", cfg.target_url);
 
@@ -194,13 +190,14 @@ async fn start_crawling(cfg: &CrawlConfig, cookie: &str) -> Result<()> {
     Ok(())
 }
 
-// ========== 主函数 ==========
+// ========== 主函数（仅修改Cookie获取逻辑，新增模拟登录调用） ==========
 #[tokio::main]
 async fn main() -> Result<()> {
     // 初始化日志
     tracing_subscriber::fmt()
         .with_env_filter("spider_enterprise_crawler=info")
         .init();
+
     // 1. 加载配置
     let config = load_config_file("config/crawler.yaml").await?;
     info!("✅ 配置加载成功");
@@ -226,7 +223,7 @@ async fn main() -> Result<()> {
             // 调用chrome_login.rs的核心登录函数
             let cookies = chrome_login(&config).await.context("❌ Chrome模拟登录失败")?;
             let cookie_str = cookies_to_string(&cookies);
-            // 登录成功后，将Cookie存入Redis
+            // 登录成功后，将Cookie存入Redis（复用原有逻辑）
             redis_conn.set_ex::<_, _, ()>(
                 &config.cookie_key,
                 &cookie_str,
@@ -237,9 +234,8 @@ async fn main() -> Result<()> {
         }
     };
 
-    // 4. 开始爬取
+    // 4. 开始爬取（原有逻辑完全不变）
     start_crawling(&config.crawl, &current_cookie).await?;
 
     Ok(())
 }
-
