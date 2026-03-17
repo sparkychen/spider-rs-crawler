@@ -74,31 +74,31 @@ xvfb-run --auto-servernum target/debug/spider-enterprise-crawler --config config
 --bundle	构建全量分发包（含二进制、配置文件、启动脚本、部署文件，输出到 dist/）	依赖 Bazel 构建完成  
 --docker	基于 Bazel 构建 Docker 镜像（镜像名 / Tag 对应脚本内 DOCKER_REGISTRY 等配置需提前安装 Docker，且 Docker 服务已启动   
 --push	推送构建好的 Docker 镜像到指定镜像仓库	必须先指定 --docker，且已登录镜像仓库  
---deploy	将爬虫部署到K8s集群（创建命名空间、ConfigMap、Secret、CronJob必须先指定 --docker/--push，且 Kubectl已配置集群权限    
+--deploy	将爬虫部署到K8s集群（创建命名空间、ConfigMap、Secret、CronJob必须先指定 --docker/--push，且Kubectl已配置集群权限    
 --start-deps	一键启动 Redis/MinIO 基础依赖（基于 deploy/docker-compose.yml）	需安装 Docker Compose，且有 sudo 权限  
 --clean	仅清理旧构建产物（Bazel 缓存、Rust 产物、日志 / 临时文件等）	无依赖，执行后直接退出 
 
 示例：  
 ### 清理 Bazel 缓存、target/、日志、临时文件等
-scripts/build.sh --clean
+./scripts/build.sh --clean
 
 ### 校验环境 → 清理旧产物 → 构建 Debug 二进制（输出到 dist/spider-enterprise-crawler）
-scripts/build.sh
+./scripts/build.sh
 
 ### 以 Release 模式构建，同时生成全量分发包（dist/ 下包含二进制+配置+部署文件）
-scripts/build.sh --release --bundle
+./scripts/build.sh --release --bundle
 
 ## 执行二进制，验证配置加载正常
 ./dist/spider-enterprise-crawler --config config/crawler.yaml
 
 ######################################################################################## 我ubuntu-24.04本机上没有装没有kubectl相关组件，暂时不支持编译docker镜像  
 ### # 构建 Release 二进制 → 构建 Docker 镜像（仅保存在本地，不推送）** --docker暂不支持
-scripts/build.sh --release --docker
+./scripts/build.sh --release --docker
 
 ### 先登录镜像仓库（示例：Docker Hub）
 docker login docker.io -u 你的用户名 -p 你的密码
 ### 构建 Release 镜像 → 推送至指定仓库
-scripts/build.sh --release --docker --push
+./scripts/build.sh --release --docker --push
 
 ## 全流程（构建 → 打包 → 镜像 → 推送 → K8s 部署）
 # 1. 前置：确保 Kubectl 已配置目标 K8s 集群（kubectl config use-context 你的集群）
