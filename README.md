@@ -9,10 +9,10 @@
 
 # 安装依赖（注：程序是基于已在使用unbutu-24.04.05，在配置该程序之前已经安装过一些依赖包或库程序，如果在其他机器上部署该程序有错误请具体问题具体分析后解决相关Issuses）  
 ##安装stable Rust
-sudo apt install -y gcc-11 g++-11
-export CC=gcc-11 CXX=g++-11
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-sudo apt install -y xvfb  
+sudo apt install -y gcc-11 g++-11  
+export CC=gcc-11 CXX=g++-11    
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh  
+sudo apt install -y xvfb    
 
 ## 验证安装  
 rustc --version  
