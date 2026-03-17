@@ -1,11 +1,14 @@
+// 1. 基础依赖导入（新增 warn/error 日志宏）
 use anyhow::{Context, Result};
 use redis::AsyncCommands;
 use serde::Deserialize;
-use tracing::{info, warn};
+use tracing::{info, warn, error};
 use std::path::Path;
+use std::process;
 use urlencoding::encode;
 use regex::Regex;
 use lazy_static::lazy_static;
+// 3. Spider核心类型
 use spider::client::header::{HeaderMap, HeaderValue, COOKIE};
 use spider::client::StatusCode;
 use spider::configuration::Configuration;
@@ -13,18 +16,17 @@ use spider::page::Page;
 use spider::website::Website;
 use spider::cookie::Cookie;
 use std::time::Duration;
-
 // ========== 新增：引入login模块（关键） ==========
 mod login;
 use login::chrome_login::chrome_login;
 use login::cookie_store::CookieStore;
 
-// ========== 配置结构体（仅补充登录相关字段，其他完全不变） ==========
+// ========== 配置结构体 ==========
 #[derive(Deserialize, Debug)]
 struct Config {
     crawl: CrawlConfig,
     redis: RedisConfig,
-    cookie: String,          // 原有字段
+    cookie: String,
     login: LoginConfig,      // 新增：登录配置
     chrome: ChromeConfig,    // 新增：Chrome配置
     cookie_key: String,      // 新增：Cookie存储的Redis Key
@@ -62,7 +64,7 @@ struct ChromeConfig {
     headless: bool,
 }
 
-// ========== 工具函数：创建目录（原有） ==========
+// ========== 工具函数：创建目录 ==========
 async fn create_dir_if_not_exists(dir: &str) -> Result<()> {
     if !Path::new(dir).exists() {
         tokio::fs::create_dir_all(dir)
@@ -73,12 +75,12 @@ async fn create_dir_if_not_exists(dir: &str) -> Result<()> {
     Ok(())
 }
 
-// ========== 核心：正则解析标题（原有） ==========
+// ========== 核心：正则解析标题 ==========
 lazy_static! {
     static ref TITLE_REGEX: Regex = Regex::new(r"(?i)<title>([\s\S]*?)</title>").unwrap();
 }
 
-// 函数参数兼容String/&str：接收&str（原有）
+// 函数参数兼容String/&str：接收&str
 fn get_title_from_html(html: &str) -> String {
     match TITLE_REGEX.captures(html) {
         Some(caps) => {
@@ -89,7 +91,7 @@ fn get_title_from_html(html: &str) -> String {
     }
 }
 
-// ========== 保存HTML页面（原有） ==========
+// ========== 保存HTML页面 ==========
 async fn save_page(page: &Page, download_dir: &str) -> Result<()> {
     let url = page.get_url();
     let encoded_url = encode(url);
@@ -106,7 +108,7 @@ async fn save_page(page: &Page, download_dir: &str) -> Result<()> {
     Ok(())
 }
 
-// ========== 加载配置（原有） ==========
+// ========== 加载配置 ==========
 async fn load_config_file(path: &str) -> Result<Config> {
     let content = tokio::fs::read_to_string(path)
         .await
@@ -124,7 +126,7 @@ fn cookies_to_string(cookies: &[Cookie]) -> String {
         .join("; ")
 }
 
-// ========== 核心爬取逻辑（完全原有，无修改） ==========
+// ========== 核心爬取逻辑 ==========
 async fn start_crawling(cfg: &CrawlConfig, cookie: &str) -> Result<()> {
     info!("🕷️ 开始爬取：{}", cfg.target_url);
 
@@ -190,7 +192,7 @@ async fn start_crawling(cfg: &CrawlConfig, cookie: &str) -> Result<()> {
     Ok(())
 }
 
-// ========== 主函数（仅修改Cookie获取逻辑，新增模拟登录调用） ==========
+// ========== 主函数（核心修改：登录失败的错误处理） ==========
 #[tokio::main]
 async fn main() -> Result<()> {
     // 初始化日志
@@ -207,7 +209,7 @@ async fn main() -> Result<()> {
     let mut redis_conn = redis_client.get_multiplexed_async_connection().await?;
     info!("✅ Redis连接成功");
 
-    // 3. 处理Cookie（核心修改：新增模拟登录逻辑）
+    // 3. 处理Cookie（核心修改：增强登录失败逻辑）
     let cookie_store = CookieStore::new(&config.redis.url).await?;
     let current_cookie: String = match cookie_store.is_cookie_valid(&config.cookie_key).await {
         // 情况1：Redis中有有效Cookie，直接加载
@@ -220,10 +222,23 @@ async fn main() -> Result<()> {
         // 情况2：Cookie无效/不存在/Redis异常，执行Chrome模拟登录
         _ => {
             warn!("⚠️ Redis中无有效Cookie，执行Chrome模拟登录...");
-            // 调用chrome_login.rs的核心登录函数
-            let cookies = chrome_login(&config).await.context("❌ Chrome模拟登录失败")?;
+            // 调用chrome_login.rs的核心登录函数（增强错误处理）
+            let cookies = match chrome_login(&config).await {
+                Ok(c) => c,
+                Err(e) => {
+                    // 登录失败：打印详细错误信息 + 终止程序
+                    error!("==================================================");
+                    error!("❌ Chrome模拟登录失败，爬取流程终止！");
+                    error!("📌 登录目标URL：{}", config.login.url);
+                    error!("📌 登录账号：{}", config.login.username);
+                    error!("📌 失败原因：{}", e);
+                    error!("==================================================");
+                    // 显式退出程序，状态码1表示执行失败
+                    process::exit(1);
+                }
+            };
             let cookie_str = cookies_to_string(&cookies);
-            // 登录成功后，将Cookie存入Redis（复用原有逻辑）
+            // 登录成功后，将Cookie存入Redis
             redis_conn.set_ex::<_, _, ()>(
                 &config.cookie_key,
                 &cookie_str,
@@ -234,7 +249,7 @@ async fn main() -> Result<()> {
         }
     };
 
-    // 4. 开始爬取（原有逻辑完全不变）
+    // 4. 开始爬取
     start_crawling(&config.crawl, &current_cookie).await?;
 
     Ok(())

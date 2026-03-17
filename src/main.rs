@@ -2,7 +2,8 @@
 use anyhow::{Context, Result};
 use redis::AsyncCommands;
 use serde::Deserialize;
-use tracing::info;
+use tracing::{info, warn, error};
+use std::process;
 use std::path::Path;
 use urlencoding::encode;
 // 2. 正则+懒加载依赖
@@ -221,8 +222,21 @@ async fn main() -> Result<()> {
         // 情况2：Cookie无效/不存在/Redis异常，执行Chrome模拟登录
         _ => {
             warn!("⚠️ Redis中无有效Cookie，执行Chrome模拟登录...");
-            // 调用chrome_login.rs的核心登录函数
-            let cookies = chrome_login(&config).await.context("❌ Chrome模拟登录失败")?;
+            // 调用chrome_login.rs的核心登录函数（增强错误处理）
+            let cookies = match chrome_login(&config).await {
+                Ok(c) => c,
+                Err(e) => {
+                    // 登录失败：打印详细错误信息 + 终止程序
+                    error!("==================================================");
+                    error!("❌ Chrome模拟登录失败，爬取流程终止！");
+                    error!("📌 登录目标URL：{}", config.login.url);
+                    error!("📌 登录账号：{}", config.login.username);
+                    error!("📌 失败原因：{}", e);
+                    error!("==================================================");
+                    // 显式退出程序，状态码1表示执行失败
+                    process::exit(1);
+                }
+            };
             let cookie_str = cookies_to_string(&cookies);
             // 登录成功后，将Cookie存入Redis
             redis_conn.set_ex::<_, _, ()>(
