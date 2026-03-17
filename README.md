@@ -67,8 +67,8 @@ xvfb-run --auto-servernum target/debug/spider-enterprise-crawler --config config
 ## 3、从脚本执行  
 ./run_crawler.sh  
 
-# scripts/build.sh使用说明
-参数： 
+## scripts/build.sh使用说明
+### 参数：     
 --help	显示帮助信息（参数说明 + 使用示例）	无依赖  
 --release	以 Release 模式构建（优化编译，产物体积更小、性能更高）	默认是 Debug 模式  
 --bundle	构建全量分发包（含二进制、配置文件、启动脚本、部署文件，输出到 dist/）	依赖 Bazel 构建完成  
