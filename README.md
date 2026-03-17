@@ -12,7 +12,9 @@
 sudo apt install -y gcc-11 g++-11  
 export CC=gcc-11 CXX=g++-11    
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh  
-sudo apt install -y xvfb    
+sudo apt install -y xvfb   
+cargo add chromiumoxide@0.9.1 && cargo add cookie@0.18.1   
+
 
 ## 验证安装  
 rustc --version  
@@ -106,3 +108,6 @@ docker login docker.io -u 你的用户名 -p 你的密码
 docker login 你的镜像仓库地址 -u 用户名 -p 密码
 ### 3. 全流程执行：启动依赖 → 构建 Release → 打包 → 构建镜像 → 推送 → 部署到 K8s
 ./scripts/build.sh --release --bundle --start-deps --docker --push --deploy
+
+
+

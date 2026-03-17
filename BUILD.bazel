@@ -40,13 +40,13 @@ rust_binary(
 )
 
 # 企业级分发包
-pkg_tar(
-    name = "crawler-package",
-    srcs = [":spider-enterprise-crawler"],
-    package_dir = "/opt/spider",
-    data = [
-        "config/",
-        "scripts/",
-    ],
-    mode = "0755",
-)
+#pkg_tar(
+#    name = "crawler-package",
+#    srcs = [":spider-enterprise-crawler"],
+#    package_dir = "/opt/spider",
+#    data = [
+#        "config/",
+#        "scripts/",
+#    ],
+#    mode = "0755",
+#)

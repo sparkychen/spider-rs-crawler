@@ -6,25 +6,28 @@ description = "Enterprise crawler based on spider-rs v2.45 with login support"
 license = "MIT"
 
 [dependencies]
-spider = { version = "2.47.22", features = [
+spider = { version = "=2.47.35", features = [
   "chrome",
-  "chrome_headed",
-  "chrome_stealth",  # 反爬（替代原stealth）
-  "cookies",         # Cookie处理（替代原cookie）
-  "sync",            # 同步支持
+  #"chrome_headed",
+  #"chrome_stealth",  # 反爬（替代原stealth）
+  #"cookies",         # Cookie处理（替代原cookie）
+  #"sync",            # 同步支持
   "tokio_io_std",    # Tokio异步IO（替代原tokio-runtime）
   "tracing"
 ] }
-cookie = "0.18"
+# 新增：解析.env文件
+dotenv = "0.15"
+cookie = "0.18.1"
+time = { version = "0.3", features = ["serde", "local-offset"] } # ✅ 新增：处理时间转换
 # 异步运行时
-tokio = { version = "1.50", features = ["full", "sync"] }
+tokio = { version = "1.50", features = ["full", "process"] }
 # 配置管理
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_yaml = "0.9"
 config = "0.14"
 # 存储依赖
-redis = { version = "0.25", features = ["tokio-comp", "serde"] }
+redis = { version = "0.25.4", features = ["tokio-comp", "serde"] }
 # minio = { version = "0.3.0", features = ["tokio"] }
 minio = { version = "0.3.0" }
 # 监控告警
@@ -35,7 +38,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 anyhow = "1.0"
 thiserror = "1.0"
 # 显式添加reqwest（确保链接）
-reqwest = { version = "0.11.22", features = ["cookies"], default-features = false }
+reqwest = { version = "0.11.22", features = ["cookies", "json", "multipart"], default-features = false }
 http = "0.2.12" # 与spider依赖的http版本一致
 hyper = { version = "1.8.1", features = ["full"] }
 # 新增：URL编码（避免文件名非法字符）
@@ -45,3 +48,4 @@ chrono = { version = "0.4", features = ["serde"] }
 # 必须添加的正则+懒加载依赖（解决所有E0432/E0433错误）
 regex = "1.10.3"
 lazy_static = "1.4.0"
+chromiumoxide = "0.9.1"

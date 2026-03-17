@@ -1,6 +1,31 @@
-###############################################################################
-# Bazel now uses Bzlmod by default to manage external dependencies.
-# Please consider migrating your external dependencies from WORKSPACE to MODULE.bazel.
-#
-# For more details, please check https://github.com/bazelbuild/bazel/issues/18958
-###############################################################################
+# MODULE.bazel - 仅保留运行Rust爬虫的最小配置（无任何冲突）
+module(
+    name = "spider_enterprise_crawler",
+    version = "2.47.22",
+    compatibility_level = 1,
+)
+
+# 仅保留Rust构建核心规则（删除所有其他依赖，杜绝冲突）
+bazel_dep(name = "rules_rust", version = "0.48.0")
+
+# Rust工具链配置（rules_rust 0.48.0 官方标准属性）
+rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
+rust.toolchain(
+    name = "rust_1_70_0",
+    edition = "2021",
+    versions = ["1.70.0"],  # 必须复数+列表
+    targets = ["x86_64-unknown-linux-gnu"],  # 必须复数+列表
+)
+use_repo(rust, "rust_1_70_0")
+
+# Cargo依赖自动解析（仅核心）
+crates = use_extension("@rules_rust//crate_universe:extensions.bzl", "crates")
+crates.from_cargo(
+    name = "cargo_deps",
+    cargo_toml = "//:Cargo.toml",
+    lockfile = "//:Cargo.lock",
+)
+use_repo(crates, "cargo_deps")
+
+# 注册Rust工具链
+register_toolchains("@rust_1_70_0//:toolchain")

@@ -11,9 +11,13 @@ login:
   login_btn_selector: "#login-submit"
 # ✅ 关键修复：cookie是单行字符串，不是map
 cookie: "session=123456; user=test; token=7890"
-#cookie:
-#  key: "spider:cookie:target-site"
-#  ttl: 86400
+cookie_key: "enterprise_spider_cookies"
+chrome_headless: true  # 是否无头模式
+cookie_ttl_seconds: 3600  # Cookie过期时间（1小时）
+chrome:
+  headless: true
+  executable_path: "/usr/bin/chromium-browser" # linux
+  # executable_path: "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe" # windows
 crawl:
   target_url: "https://mail.163.com/js6/main.jsp"
   #target_url: "https://target-site.com/dashboard"
@@ -24,8 +28,6 @@ crawl:
 request_delay: 1000
 proxy: ""
 user_agent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-chrome:
-  headless: true
 storage:
   minio:
     endpoint: "http://127.0.0.1:9000"

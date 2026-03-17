@@ -6,63 +6,129 @@ use tracing::{info, warn, error};
 use std::process;
 use std::path::Path;
 use urlencoding::encode;
-// 2. 正则+懒加载依赖
+// 新增：解析.env和替换环境变量
+use dotenv::dotenv;
+use std::env;
 use regex::Regex;
+// 2. 正则+懒加载依赖
 use lazy_static::lazy_static;
 // 3. Spider核心类型
 use spider::client::header::{HeaderMap, HeaderValue, COOKIE};
-use spider::client::StatusCode;
+// use spider::client::StatusCode;
 use spider::configuration::Configuration;
 use spider::page::Page;
 use spider::website::Website;
-use spider::cookie::Cookie;
-use std::time::Duration;
-// ========== 新增：引入login模块（关键） ==========
+// 4. Cookie+模块导入
+use cookie::Cookie as ExternalCookie;
 mod login;
-use login::chrome_login::chrome_login;
-use login::cookie_store::CookieStore;
+use login::{CookieStore, login_with_chrome};
 
-// ========== 配置结构体 ==========
-#[derive(Deserialize, Debug)]
-struct Config {
-    crawl: CrawlConfig,
-    redis: RedisConfig,
-    cookie: String,
-    login: LoginConfig,      // 新增：登录配置
-    chrome: ChromeConfig,    // 新增：Chrome配置
-    cookie_key: String,      // 新增：Cookie存储的Redis Key
-    proxy: String,           // 新增：代理配置
-    request_delay: u64,      // 新增：请求延迟
+// ========== 环境变量替换工具函数 ==========
+fn replace_env_vars(s: &str) -> String {
+    lazy_static! {
+        static ref ENV_REGEX: Regex = Regex::new(r"\$\{([A-Za-z0-9_]+)\}").unwrap();
+    }
+    ENV_REGEX.replace_all(s, |caps: &regex::Captures| {
+        let var_name = &caps[1];
+        env::var(var_name).unwrap_or_else(|_| format!("${{{}}}", var_name))
+    }).to_string()
 }
 
-#[derive(Deserialize, Debug)]
-struct CrawlConfig {
-    target_url: String,
-    depth: usize,
-    concurrency: usize,
-    download_dir: Option<String>,
-}
-
-#[derive(Deserialize, Debug)]
-struct RedisConfig {
-    url: String,
-    cookie_ttl: u64,
-}
-
-// ========== 新增：登录/Chrome配置结构体（匹配yaml） ==========
+// ========== 统一Config结构体 ==========
 #[derive(Deserialize, Debug, Clone)]
-struct LoginConfig {
-    url: String,
-    username: String,
-    password: String,
-    username_selector: String,
-    password_selector: String,
-    login_btn_selector: String,
+pub struct CrawlConfig {
+    pub target_url: String,
+    pub depth: usize,
+    pub concurrency: usize,
+    pub use_chrome: Option<bool>,
+    pub download_dir: Option<String>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
-struct ChromeConfig {
-    headless: bool,
+pub struct RedisConfig {
+    pub url: String,
+    pub cookie_ttl: u64,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct LoginConfig {
+    pub url: String,
+    pub username: String,
+    pub password: String,
+    pub username_selector: String,
+    pub password_selector: String,
+    pub login_btn_selector: String,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct ChromeConfig {
+    pub headless: bool,
+    pub executable_path: String,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct MinioConfig {
+    pub endpoint: String,
+    pub access_key: String,
+    pub secret_key: String,
+    pub bucket: String,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct StorageConfig {
+    pub minio: MinioConfig,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct MonitorConfig {
+    pub metrics_port: u16,
+    pub log_level: String,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct Config {
+    pub redis: RedisConfig,
+    pub login: LoginConfig,
+    pub cookie: String,
+    pub cookie_key: String,
+    pub chrome_headless: Option<bool>,
+    pub cookie_ttl_seconds: Option<u64>,
+    pub chrome: ChromeConfig,
+    pub crawl: CrawlConfig,
+    pub request_delay: u64,
+    pub proxy: String,
+    pub user_agent: Option<String>,
+    pub storage: Option<StorageConfig>,
+    pub monitor: Option<MonitorConfig>,
+}
+
+// ========== 加载配置（含环境变量替换） ==========
+async fn load_config_file(path: &str) -> Result<Config> {
+    // 加载.env文件
+    dotenv().ok();
+    
+    // 读取YAML文件
+    let content = tokio::fs::read_to_string(path)
+        .await
+        .context(format!("❌ 读取配置文件 {} 失败", path))?;
+    
+    // 替换环境变量占位符
+    let content_with_env = replace_env_vars(&content);
+    
+    // 解析YAML
+    let mut config: Config = serde_yaml::from_str(&content_with_env)
+        .context("❌ 解析YAML配置失败")?;
+    
+    // 二次替换（防止嵌套环境变量）
+    config.login.username = replace_env_vars(&config.login.username);
+    config.login.password = replace_env_vars(&config.login.password);
+    config.storage = config.storage.map(|mut s| {
+        s.minio.access_key = replace_env_vars(&s.minio.access_key);
+        s.minio.secret_key = replace_env_vars(&s.minio.secret_key);
+        s
+    });
+
+    Ok(config)
 }
 
 // ========== 工具函数：创建目录 ==========
@@ -81,7 +147,6 @@ lazy_static! {
     static ref TITLE_REGEX: Regex = Regex::new(r"(?i)<title>([\s\S]*?)</title>").unwrap();
 }
 
-// 函数参数兼容String/&str：接收&str
 fn get_title_from_html(html: &str) -> String {
     match TITLE_REGEX.captures(html) {
         Some(caps) => {
@@ -99,7 +164,6 @@ async fn save_page(page: &Page, download_dir: &str) -> Result<()> {
     let filename = format!("{}.html", &encoded_url.chars().take(50).collect::<String>());
     let file_path = Path::new(download_dir).join(filename);
 
-    // 适配page.get_html()返回String的情况
     let html = page.get_html();
     tokio::fs::write(&file_path, html)
         .await
@@ -109,149 +173,144 @@ async fn save_page(page: &Page, download_dir: &str) -> Result<()> {
     Ok(())
 }
 
-// ========== 加载配置 ==========
-async fn load_config_file(path: &str) -> Result<Config> {
-    let content = tokio::fs::read_to_string(path)
-        .await
-        .context(format!("❌ 读取配置 {} 失败", path))?;
-    
-    serde_yaml::from_str(&content).context("❌ 解析YAML失败")
-}
-
-// ========== 新增：Cookie转字符串工具函数 ==========
-fn cookies_to_string(cookies: &[Cookie]) -> String {
-    cookies
-        .iter()
-        .map(|c| format!("{}={}", c.name(), c.value()))
-        .collect::<Vec<_>>()
-        .join("; ")
-}
-
 // ========== 核心爬取逻辑 ==========
-async fn start_crawling(cfg: &CrawlConfig, cookie: &str) -> Result<()> {
-    info!("🕷️ 开始爬取：{}", cfg.target_url);
+// 修复后：传入顶级Config的request_delay/user_agent
+async fn start_crawling(
+    crawl_cfg: &CrawlConfig, 
+    cookie: &str, 
+    request_delay: u64,  // ✅ 新增：顶级request_delay
+    user_agent: Option<&str>  // ✅ 新增：顶级user_agent
+) -> Result<()> {
+    info!("🕷️ 开始爬取目标URL：{}", crawl_cfg.target_url);
 
-    // 爬虫配置
     let mut config = Configuration::new();
     config
-        .with_depth(cfg.depth)
-        .with_concurrency_limit(Some(cfg.concurrency))
-        .with_user_agent(Some("Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:123.0) Gecko/20100101 Firefox/123.0"))
-        .with_delay(1000);
+        .with_depth(crawl_cfg.depth)
+        .with_concurrency_limit(Some(crawl_cfg.concurrency))
+        .with_delay(request_delay); // ✅ 修正：使用传入的request_delay（不再用cfg.request_delay）
 
-    // 初始化爬取器
-    let mut website = Website::new(&cfg.target_url);
+    // 设置User-Agent（修复类型不匹配+字段归属）
+    if let Some(ua) = user_agent { // ✅ 修正：使用传入的user_agent
+        config.with_user_agent(Some(ua)); // ✅ 符合Option<&str>类型
+    } else {
+        // ✅ 修复：用Some包裹字符串，匹配Option<&str>类型
+        config.with_user_agent(Some("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"));
+    }
+
+    let mut website = Website::new(&crawl_cfg.target_url);
     website.with_config(config);
 
-    // 添加Cookie
+    // 添加Cookie（无变化）
     let mut headers = HeaderMap::new();
     if let Ok(cookie_val) = HeaderValue::from_str(cookie) {
         headers.insert(COOKIE, cookie_val);
     }
     website.with_headers(Some(headers));
 
-    // 订阅结果 + 初始化下载目录
-    let rx = website.subscribe(cfg.concurrency).expect("❌ 订阅失败");
-    let download_dir = cfg.download_dir.as_deref().unwrap_or("downloads");
+    let rx = website.subscribe(crawl_cfg.concurrency).expect("❌ 订阅爬虫结果失败");
+    let download_dir = crawl_cfg.download_dir.as_deref().unwrap_or("downloads");
     create_dir_if_not_exists(download_dir).await?;
 
-    // 开始爬取
+    // 开始爬取（无变化）
     website.crawl().await;
 
-    // 处理爬取结果（核心修复：强制将html转为&str）
+    // 处理爬取结果（仅把cfg改为crawl_cfg，其余不变）
     let mut count = 0;
     let mut rx_mut = rx;
     while let Ok(page) = rx_mut.recv().await {
         count += 1;
         let url = page.get_url().to_string();
-        let html = page.get_html(); // 你的版本返回String
+        let html = page.get_html();
         
-        // ✅ 最后修复：强制传递&str（不管html是String还是&str）
         let title = get_title_from_html(&html); 
 
-        // 打印信息
-        info!("\n===== 页面 {} =====", count);
+        // 打印信息（cfg → crawl_cfg）
+        info!("\n===== 爬取结果 #{} =====", count);
         info!("URL: {}", url);
         info!("标题: {}", title);
-        info!("HTML长度: {} 字节", html.len());
-        info!("前200字符: {}", &html.chars().take(200).collect::<String>());
-        
-        // 状态码
-        let status_code = if page.status_code == StatusCode::default() {
-            0
-        } else {
-            page.status_code.as_u16()
-        };
-        info!("状态码: {}", status_code);
+        info!("页面大小: {} 字节", html.len());
+        info!("状态码: {}", page.status_code.as_u16()); // ✅ 若用不到StatusCode，可删掉这行
         info!("=======================\n");
 
-        // 保存页面
+        // 保存页面（cfg → crawl_cfg）
         save_page(&page, download_dir).await?;
     }
 
-    info!("🎉 爬取完成 | 共 {} 页 | 保存至: {}", count, download_dir);
+    info!("🎉 爬取完成 | 共爬取 {} 个页面 | 保存至: {}", count, download_dir);
     Ok(())
 }
 
-// ========== 主函数 ==========
+// ========== 主函数（强化登录失败处理） ==========
 #[tokio::main]
 async fn main() -> Result<()> {
     // 初始化日志
     tracing_subscriber::fmt()
         .with_env_filter("spider_enterprise_crawler=info")
         .init();
-    // 1. 加载配置
-    let config = load_config_file("config/crawler.yaml").await?;
-    info!("✅ 配置加载成功");
+    
+    // 1. 加载配置（含.env解析）
+    let config: Config = load_config_file("config/crawler.yaml").await?;
+    info!("✅ 配置加载成功（已解析.env环境变量）");
+    info!("🔍 待验证的登录账号：{}", config.login.username);
 
     // 2. 连接Redis
-    let redis_client = redis::Client::open(config.redis.url.clone()).context("❌ Redis连接失败")?;
+    let redis_client = redis::Client::open(config.redis.url.clone())
+        .context("❌ Redis连接失败")?;
     let mut redis_conn = redis_client.get_multiplexed_async_connection().await?;
-    info!("✅ Redis连接成功");
+    info!("✅ Redis连接成功（地址：{}）", config.redis.url);
 
-    // 3. 处理Cookie（核心修改：新增模拟登录逻辑）
-    let cookie_store = CookieStore::new(&config.redis.url).await?;
+    // 3. 处理Cookie（核心：错误账号密码强制失败）
+    let cookie_store: CookieStore = CookieStore::new(&config.redis.url).await?;
     let current_cookie: String = match cookie_store.is_cookie_valid(&config.cookie_key).await {
         // 情况1：Redis中有有效Cookie，直接加载
         Ok(true) => {
-            let cookies = cookie_store.get_cookies(&config.cookie_key).await.context("❌ 读取Redis Cookie失败")?;
-            let cookie_str = cookies_to_string(&cookies);
-            info!("✅ 从Redis加载有效Cookie");
+            let cookies: Vec<ExternalCookie<'static>> = cookie_store.get_cookies(&config.cookie_key).await
+                .context("❌ 读取Redis Cookie失败")?;
+            let cookie_str = cookies.iter()
+                .map(|c| format!("{}={}", c.name(), c.value()))
+                .collect::<Vec<_>>()
+                .join("; ");
+            info!("✅ 从Redis加载有效Cookie（有效期剩余：{}秒）", config.redis.cookie_ttl);
             cookie_str
         }
-        // 情况2：Cookie无效/不存在/Redis异常，执行Chrome模拟登录
+        // 情况2：执行登录（错误账号密码强制失败）
         _ => {
-            warn!("⚠️ Redis中无有效Cookie，执行Chrome登录...");
-            // 调用chrome_login.rs的核心登录函数（增强错误处理）
-            let cookies = match chrome_login(&config).await {
+            warn!("⚠️ Redis中无有效Cookie，执行登录验证...");
+            // 调用登录函数 + 强制失败处理
+            let cookies: Vec<ExternalCookie<'static>> = match login_with_chrome(&config).await {
                 Ok(c) => c,
                 Err(e) => {
-                    // 登录失败：打印详细错误信息 + 终止程序
-                    error!("==================================================");
-                    error!("❌ Chrome登录失败，爬取流程终止！");
-                    error!("📌 登录目标URL：{}", config.login.url);
-                    error!("📌 登录账号：{}", config.login.username);
-                    error!("📌 失败原因：{}", e);
-                    error!("==================================================");
-                    // 显式退出程序，状态码1表示执行失败
-                    process::exit(1);
+                    // 强化登录失败处理：打印详细错误 + 退出程序
+                    error!("\n======================= 登录失败 =======================");
+                    error!("🚨 账号密码验证失败，程序终止！");
+                    error!("📝 失败原因：{}", e);
+                    error!("🔍 验证账号：{}", config.login.username);
+                    error!("=======================================================\n");
+                    process::exit(1); // 非0状态码表示失败
                 }
             };
-            let cookie_str = cookies_to_string(&cookies);
-            // 登录成功后，将Cookie存入Redis
+            // 登录成功：存入Redis
+            let cookie_str = cookies.iter()
+                .map(|c| format!("{}={}", c.name(), c.value()))
+                .collect::<Vec<_>>()
+                .join("; ");
             redis_conn.set_ex::<_, _, ()>(
                 &config.cookie_key,
                 &cookie_str,
                 config.redis.cookie_ttl
             ).await.context("❌ Cookie存入Redis失败")?;
-            info!("✅ 模拟登录成功，Cookie已缓存（有效期：{}秒）", config.redis.cookie_ttl);
+            info!("✅ 登录成功，Cookie已缓存至Redis（有效期：{}秒）", config.redis.cookie_ttl);
             cookie_str
         }
     };
 
-    // 4. 开始爬取
-    start_crawling(&config.crawl, &current_cookie).await?;
+    // 修复后的调用
+    start_crawling(
+        &config.crawl, 
+        &current_cookie, 
+        config.request_delay,
+        config.user_agent.as_deref()
+    ).await?;
 
     Ok(())
 }
-
