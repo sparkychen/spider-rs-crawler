@@ -105,4 +105,4 @@ docker login docker.io -u 你的用户名 -p 你的密码
 # 2. 登录镜像仓库
 docker login 你的镜像仓库地址 -u 用户名 -p 密码
 # 3. 全流程执行：启动依赖 → 构建 Release → 打包 → 构建镜像 → 推送 → 部署到 K8s
-scripts/build.sh --release --bundle --start-deps --docker --push --deploy
+./scripts/build.sh --release --bundle --start-deps --docker --push --deploy
